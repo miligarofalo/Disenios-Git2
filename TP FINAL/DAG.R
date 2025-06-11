@@ -118,3 +118,130 @@ ggsave("dag_paths_soledad_to_suicidio.pdf", dag_plot, width = 20, height = 16)  
 
 
 
+# ------------------------------------------------------------------------------------------
+install.packages("MatchIt")
+library(MatchIt)
+
+
+library(rstudioapi)
+library(readr)
+setwd(dirname(getActiveDocumentContext()$path))
+getwd()
+data <- read_csv("National.csv")
+
+
+# ------------------------------------------------------------------------------------------------------------------------------
+# FILTRADO DE BASE DE DATOS
+
+# Columnas a excluir explícitamente
+excluir <- c("weight", "stratum", "psu", "site", "record")
+
+# Filtrar columnas que NO empiezan con 'qn' y NO están en la lista de exclusión
+columnas_filtradas <- setdiff(names(data), c(excluir, grep("^qn", names(data), value = TRUE)))
+
+# Filtrar el DataFrame con las columnas filtradas
+data <- data[, columnas_filtradas]
+
+# Variables de interés (similar a lo que tenías en el código Python)
+variables_interes <- c(
+  'q1', 'q2', 'q4', 'q5', 'q6', 'q10', 'q15', 'q16', 'q22', 
+  'q26', 'q27', 'q28', 'q29', 'q30', 'q31', 'q34', 'q35', 'q36',
+  'q38', 'q40', 'q41', 'q42', 'q43', 'q49', 'q55', 'q56', 'q57', 
+  'q58', 'q61', 'q62', 'q66', 'q67', 'q68'
+)
+
+# Eliminar columnas que no están en las variables de interés
+data_interes <- data[, variables_interes]
+
+# Variables que NO están en la selección de interés
+variables_no_interes <- setdiff(names(data), variables_interes)
+
+# Verificar los resultados
+cat("Variables mantenidas:\n")
+print(names(data_interes))
+
+cat("\nVariables no de interés:\n")
+print(variables_no_interes)
+
+
+
+# VARIABLES FINALES
+# q1 --> EDAD
+# q2 --> SEXO
+# q22 --> se sintio solo
+# q26 --> intento suicidarse
+# q49 --> actividad física
+
+# q66 q67 q68 (ciberbullying) --> bullying AGREGAR TABLA TEORICA
+# q55 q56 q57 q58  --> contención familiar
+# q39/q33     --> consumo familiar
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Supongamos que tu dataframe es 'df' y 'Suicidio' es la variable binaria
+# Ajustar el modelo logit
+modelo_logit <- glm(Suicidio ~ Soledad + Edad + Sexo + Bullying + Consumo_Familiar + Contencion_Familiar, 
+                    family = binomial(link = "logit"), data = data)
+
+
+# Resumen del modelo
+summary(modelo_logit)
+
+matching <- matchit(Suicidio ~ Sexo + Edad + Actividad_Fisica, 
+                    data = df, 
+                    method = "nearest", 
+                    distance = "mahalanobis", 
+                    discard = "none")  # Usamos la distancia Mahalanobis
+
+# Resumen de los resultados del matching
+summary(matching)
+
+# Obtener el conjunto emparejado
+matched_data <- match.data(matching)
+
+# Ver los resultados del matching
+head(matched_data)
+
+# Verificar el balance de covariables después del matching
+plot(matching)
+
+
+# Ajustar el modelo logit en el conjunto emparejado
+modelo_final <- glm(Suicidio ~ Soledad + Sexo + Edad + Actividad_Fisica, 
+                    family = binomial(link = "logit"), data = matched_data)
+
+# Resumen del modelo final
+summary(modelo_final)
+
+
+
+
+# Guardar el gráfico del DAG (Si lo necesitas)
+ggsave("dag_paths_soledad_to_suicidio.pdf", plot = last_plot(), width = 20, height = 16)
+
+# Guardar el conjunto de datos emparejado
+write.csv(matched_data, "matched_data.csv")
