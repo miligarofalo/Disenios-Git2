@@ -1,0 +1,285 @@
+---
+title: "Trabajo Practico 2"
+format: html
+editor: visual
+---
+
+```{r, warning=FALSE, message=FALSE}
+library(ggdag)
+library(dagitty)
+library(modelsummary)
+library(ggplot2)
+```
+
+## Actividad 1.
+
+## Lluvias e inundaciones
+
+El DAG que observan a continuacion representa el modelo causal de un investigador que quiere estudiar el efecto de la **tropicalizacion de los ecosistemas** (que su clima se haya vuelto mas lluvioso y cálido durante todo el año) sobre las **inundaciones** en las ciudades de ese ecosistema. Para eso definio estas variables operacionales en donde:
+
+-   **Lluvias**, es la cantidad de mm acumulados que llovió el año de observación
+
+-   **Vegetación**: es índice de cobertura arbolada de la ciudad observada
+
+-   **Imperm**: se refiere al porcentaje de superficie impermeable de la ciudad estudiada (o lo que es lo mismo el porcentaje de cobertura de su superficie con asfalto o edificaciones)
+
+-   **Actividad**, se refiere a la actividad humana, es un indice compuesto por la densidad poblacional y de industrias en la ciudad
+
+-   **Obra_publica**: es el dinero destinado durante el último año para la infraestructura urbana que evite inundaciones
+
+```{r, warning=FALSE, message=FALSE}
+cambio_climatico<-dagitty("dag {
+Obra_publica -> Inundaciones
+Actividad -> Tropicalizacion
+Actividad -> Imperm
+Actividad -> Vegetacion
+Tropicalizacion -> Lluvias
+Tropicalizacion -> Vegetacion
+Imperm -> Inundaciones
+Lluvias -> Inundaciones
+Lluvias -> Vegetacion
+Vegetacion -> Imperm
+Vegetacion -> Inundaciones
+}")
+
+ggdag(cambio_climatico) + theme_dag()+
+  geom_dag_node(color ="pink") + 
+  geom_dag_text(color = "black", size=3.5)+
+  geom_dag_edges(size = 1.5)
+```
+
+### 1. Caminos de causalidad
+
+¿Cuantos caminos de causalidad abiertos identifica en este DAG? Grafiquelos
+
+```{r}
+# escriba el codigo aquí
+
+#primero probamos diferentes métodos para visualizar los caminos
+ggdag_paths(from = "Tropicalizacion", to= "Inundaciones", cambio_climatico)
+
+cambio_climatico %>% ggdag_paths_fan (from = "Tropicalizacion", to= "Inundaciones", shadow = TRUE, node_size = 18, text_size = 4, spread = 1.5, label_size = text_size, node= TRUE, text_col = "white")
+
+#Vemos si desde el código podemos visualizar algún ajuste
+ggdag_adjustment_set(exposure = "Tropicalizacion", outcome = "Inundaciones",cambio_climatico, node_size = 14) + theme(legend.position = "bottom")
+
+#ajustamos por Actividad
+cambio_climatico %>% ggdag_paths_fan (from = "Tropicalizacion", to= "Inundaciones", adjust_for = "Actividad", shadow = TRUE, node_size = 18, text_size = 4, spread = 1.5, label_size = text_size, node= TRUE, text_col = "white")
+```
+
+*------------------------------------------------------------------------------------------------------*
+
+*En el DAG resaltamos en colores 8 caminos causales abiertos ya que el paquete {ggdag} y {dagitty} no distingue entre caminos causales y no causales, considerando así todos los caminos posibles entre la exposición y el resultado, sean abiertos o cerrados, causales o espurios (caminos despintados). Mirando el gráfico solo 5 de esos 8 caminos quedan como causales abiertos cuando se ajusta por Actividad (ya que los otros 3 se cierran). El primer camino va desde Tropicalización hacia Lluvias y luego Inundaciones. El segundo va desde Tropicalización, a Lluvias, hacia Vegetación, luego a Imperm y finalmente a Inundaciones. El tercer camino va desde Tropicalización, a Lluvias, hacia Vegetación y finalmente hacia Inundaciones. El cuarto camino va desde Tropicalización hacia Vegetación, Imper y luego hacia Inundaciones. El quinto va desde Tropicalización, hacia Vegetación, y finalmente hacia Inundaciones.*
+
+*Los caminos sexto, séptimo y octavo (que aparecen en el primer gráfico de caminos) contienen la variable "Actividad" que actúa como confusora. En el caso del sexto camino sale desde Actividad hacia Tropicalización y hacia Imperm que termina en inundaciones. El séptimo va desde Actividad hacia Tropicalización y hacia Vegetación luego Imper llegando a Inundaciones. Por último, el octavo comienza en actividad afectando Tropicalización y Vegetación la cual llega a Inundaciones.*
+
+*Obras públicas no pertenece a ningún camino debido a que no abre caminos espurios ni causales entre la exposición y el outcome, por lo que no hay que controlarla para estimar el efecto causal entre las variables de interés.*
+
+*-------------------------------------------------------------------------------------------------------*
+
+### 2. Creando un modelo apropiado
+
+Ayude a este investigador a navegar su modelo causal y sugierale el mejor modelo para evaluar la hipotesis de causalidad que se plantea (que la tropicalizacion de los ecosistemas es la responsable de las inundaciones). Si el modelo va a incluir covariables justifique la decision de cual de ellas incluir y por qué.
+
+*------------------------------------------------------------------------------------------------------*
+
+*Para que el modelo sea causal es necesario identificar y bloquear los caminos de confusión, sin bloquear los caminos causales (mediadores). Actividad debe ser incluida como covariable porque es una confusora: afecta tanto a la exposición (Tropicalización) como a otras variables que a su vez afectan a Inundaciones (como Imperm y Vegetación). Es decir: Exposición (Tropicalización) ← Confusora (Actividad) → Mediadora (Vegetación) → Outcome (Inundaciones). Esto es porque cuando se encadenan las variables pero Actividad sigue afectando tanto a la de Exposición y al Outcome entonces sigue siendo confusora.*
+
+*De esta manera el modelo: no ajusta por collider (inventando un efecto), corrige/ajusta por confusora (evitando crear un efecto) y no ajusta por mediador evitando subestimar el efecto total.*
+
+*Inundaciones= β0 ​+ β1 \* Tropicalización + β2​ \* Actividad + ϵ*
+
+*-------------------------------------------------------------------------------------------------------*
+
+## Actividad 2.
+
+## Pantallas y obesidad
+
+Un investigador está interesado en el **tiempo que pasan los niños frente a las pantallas** *(exposición)* como un desencadenante de la **obesidad infantil** *(outcome).*
+
+Para ello estudio a 1000 niños de entre 10 y 12 años y armo el dataset que esta a continuación en donde recabo:
+
+-   nivel socioeconomico (como una variable ordinal)
+
+-   educacion (en años)
+
+-   una escala de actividad fisica (que va de -3: sedentarismo total, a +3: estilo de vida muy activo)
+
+-   una escala de autoestima que va de -10 (imagen personal muy negativa) a +10 (imagen personal extremadamente positiva).
+
+-   Horas diarias que pasan frente a una pantalla (de 0 a 24)
+
+-   presencia o no de obesidad.
+
+Para plasmar su marco teórico construyó este **DAG:**
+
+```{r, warning=FALSE, message=FALSE}
+# DAG
+set.seed(124)
+dag <- dagitty("dag {
+  A_fisica -> Obesidad
+  N_socioeconomico -> T_pantalla
+  N_socioeconomico -> Educacion
+  T_pantalla -> A_fisica
+  T_pantalla -> Autoestima
+  Educacion -> A_fisica
+  Educacion -> T_pantalla
+  Educacion -> Autoestima
+  Educacion -> Obesidad
+  Obesidad -> Autoestima
+}")
+
+ggdag(dag) + theme_dag()+
+  geom_dag_node(color ="pink") + 
+  geom_dag_text(color = "black", size=3.5)+
+  geom_dag_edges(size = 1.5)
+
+```
+
+Esta es la base de datos con la que vamos a a trabajar
+
+```{r, warning=FALSE, message=FALSE}
+library(readr)
+obesidad_pantallas <- read_csv("obesidad_pantallas.csv")
+```
+
+## Modelos
+
+En funcion de su DAG el investigador construyo los siguientes modelos
+
+```{r}
+Model1<- glm(obesidad ~ tiempo_pantalla, data = obesidad_pantallas, family = binomial)
+Model2<-glm(obesidad ~ tiempo_pantalla+actividad_fisica, data = obesidad_pantallas, family = binomial)
+Model3<-glm(obesidad ~ tiempo_pantalla+autoestima, data = obesidad_pantallas, family = binomial)
+
+models<-list(Model1,Model2,Model3)
+
+modelsummary(models)
+
+modelplot(models, coef_omit = 'Interc')
+```
+
+### 1. Interpretación
+
+Ahora que tiene los modelos y esta tabla de resultados escriba un texto breve interpretando cada uno de los modelos y los efectos de las variables incluidas. *Si tiene que hacer algun calculo extra puede hacerlo*
+
+*------------------------------------------------------------------------------------------------------*
+
+***Modelo 1 (obesidad explicada por el tiempo en pantalla)***
+
+*Para este modelo el **intercept** fue de -7.887, por lo tanto, si calculamos el odds, luego del despeje nos queda que la probabilidad de que el modelo prediga que un niño es obeso asumiendo que el resto de las variables son 0, es de 0.000374. Si el tiempo de pantalla es 0, es muy poco probable que el niño sea obeso.*
+
+*e\^Bo = ODDS —\> e\^(-7.887) = 0.000375*
+
+*p/(1-p)= e\^Bo*
+
+*por lo tanto, p/(1-p)= ODDS*
+
+*p = (1-p) \* ODDS*
+
+*p= ODDS - p\* ODDS*
+
+*p + p\*ODDS = ODDS*
+
+*p\* (1 + ODDS) = ODDS*
+
+*p= ODDS / 1 + ODDS*
+
+*reemplazando –\> p = 0.000375 / (1 + 0.000375) = 0.000376 aprox.*
+
+*Por otro lado, el **coeficiente** de tiempo_pantalla nos indica que por cada unidad que aumente X, el logaritmo de la razón de probabilidad aumenta en 0.849*
+
+*Por ejemplo, si una persona pasa 1h frente a una pantalla:*
+
+*e\^Bo+B1X = ODDS —\> e\^(-7.887 + 0.849\*1) = 0.00087*
+
+*reemplazando –\> p = 0.00087 / (1 + 0.00087) = 0.000877 aprox.*
+
+*Pero si una persona pasa 20h frente a la pantalla, la probabilidad aumenta exponencialmente:*
+
+*e\^Bo+B1a = ODDS —\> e\^(-7.887 + 0.849\*20) = 8892.8*
+
+*reemplazando –\> p = 8892.8/ (1 + 8892.8) = 0.9998 aprox.*
+
+***Modelo 2 (obesidad explicada por el tiempo en pantalla y la actividad física)***
+
+*Sigue con la misma lógica que el modelo anterior, pero esta vez se agrega una nueva variable.*
+
+*El **intercept** es distinto al del modelo uno ya que en dicho modelo, si bien el tiempo en pantalla podría ser cero, no se contemplaba si la actividad física existía o no. Tiene sentido que el intercept de M2 sea mayor al de M1 porque, independientemente de que tiempo_pantalla sea 0, en actividad física este número implica la existencia de algún tipo de actividad (no es sedentarismo ni una vida demasiado activa, es neutro).*
+
+*e\^Bo = ODDS —\> e\^(-6.102) = 0.00223*
+
+*reemplazando –\> p = 0.00223/ (1 + 0.00223) = 0.0022 aprox.*
+
+*Además, el B1 de tiempo_pantalla indica que por cada unidad que aumente X, el logaritmo de la razón de probabilidad aumenta en 0.569. Por otro lado, la variable actividad_fisica tiene **coeficiente** negativo, lo que representa que aumentar la actividad física reduce en 0.96 el log odds.*
+
+*Por ejemplo, el modelo de una persona muy sedentaria (W= -3) que pase algunas horas en pantalla (X=5) se vería así:*
+
+*X= Tiempo en pantalla*
+
+*W: actividad física*
+
+*e\^Bo+B1X + B2W = ODDS —\> e\^(-6.102+ 0.569\*5-0.964\*(-3) ) = 0.694*
+
+*reemplazando –\> p = 0.694/ (1 + 0.694) = 0.4097 aprox.*
+
+*Si la persona es sedentaria, la probabilidad de ser obeso aumenta considerablemente. Por lo que la actividad física puede brindar un efecto protector.*
+
+***Modelo 3 (obesidad explicada por el tiempo en pantalla y autoestima)***
+
+*Al igual que el modelo previo, en el caso de la nueva variable (autoestima) que tome el valor 0 no implica que la persona tenga una imagen negativa de si misma, sino neutral. Si bien el análisis es bastante similar al del modelo 2, lo sorprendente en este caso es que el coeficiente de tiempo en pantalla ahora es negativo.*
+
+***Análisis de IC***
+
+*Con respecto a los* ***intervalos de confianza**, en el modelo 1, la línea no cruza el cero lo cual significa que es significativo. Además, el tiempo en pantalla muestra un coeficiente positivo que puede significar que un mayor tiempo en pantalla incrementa la variable de obesidad.*
+
+*Por otro lado, en el modelo 2, vemos que el tiempo en pantalla presenta un coeficiente negativo pero, como el intervalo de confianza cruza el cero, la asociación no es significativa. Lo cual nos muestra que cuando agregamos actividad física al modelo, se modifica la significancia de los coeficientes. Además, por el DAG, sabemos que la actividad física es una variable mediadora entre el tiempo en pantalla y la obesidad, por ello, puede que ajustando el modelo con otras variables podamos observar de mejor manera la tendencia de realizar una mayor actividad física.*
+
+*Finalmente en el modelo 3, al agregar la variable autoestima, que por el DAG sabemos que es collider, se invierten los coeficientes de tiempo en pantalla (es decir, pasan de ser positivos a negativos) y aumenta la incertidumbre ya que su intervalo se vuelve más grande.*
+
+*-------------------------------------------------------------------------------------------------------*
+
+### **2. Interpretando el efecto de las pantallas**
+
+Ayude al investigador a resolver su pregunta principal, ¿La exposicion a las pantallas puede causar obesidad? Justifique su respuesta con datos obtenidos de los modelos.
+
+*------------------------------------------------------------------------------------------------------*
+
+*No se puede inferir causalidad a partir de los datos analizados: dos de los modelos ajustan por variables mediadoras y colliders, y los tres omiten confusoras relevantes. Por eso, la asociación podría deberse a otros factores no modelados y solo puede usarse para hacer predicciones, no para afirmar una relación causa-efecto. Esto ocurre con los modelos 1 y 2 en los que se observó una gran asociación entre el tiempo en pantalla y la probabilidad de desarrollar obesidad (con coef. 0.849 y 0.569 respectivamente) lo que brinda información útil para llevar a cabo predicciones.*
+
+*-------------------------------------------------------------------------------------------------------*
+
+### **3. Seleccionando modelos**
+
+En la salida anterior podemos ver junto con los modelos tambien las métricas de performance de los mismos. ¿Cuál es el mejor modelo?
+
+*------------------------------------------------------------------------------------------------------*
+
+*Si nos enfocamos únicamente en las métricas de performance (mejor AIC y LogLik que los demás modelos), el mejor modelo sería el 3. Sin embargo, este modelo está sesgado ya que, como se mencionó anteriormente, la variable "autoestima" es un collider que está influenciada por la obesidad, por lo que podría ser una consecuencia más que una causa. Es por esta razón que se descartó dicho modelo como el mejor y se compararon las métricas de los modelos 1 y 2.*
+
+*En el caso del Modelo 2, cuenta con un mejor AIC que el 1, pero no mejora su RMSE y, además, ajusta por una mediadora (actividad física), lo cual no refleja el verdadero efecto del tiempo de pantalla sobre la obesidad.*
+
+*En resumen, el mejor modelo es el 1 ya que tiene RMSE igual a los demás, AIC/BIC apenas más alto mientras que no introduce sesgos y nos permite realizar una inferencia causal válida.*
+
+*--------------------------------------------------------------------------------------------------------*
+
+### 4. Proponiendo nuevas formas de analizar los datos
+
+Hay variables que el investigador no ha incluído en el modelo, ¿ud que piensa?, ¿incluiría alguna de ellas?, ¿podria generar un modelo que a su parecer sea superador? Escribalo, corralo e interpretelo
+
+```{r}
+# corra su modelo aqui
+Modelo_nuevo <- glm(obesidad ~ tiempo_pantalla + educacion, data = obesidad_pantallas, family = binomial)
+
+summary(Modelo_nuevo)
+
+modelplot(Modelo_nuevo, coef_omit = "Interc")
+```
+
+*------------------------------------------------------------------------------------------------------*
+
+*Podríamos mejorar el análisis incorporando educación, ya que según el DAG es una variable confusora entre el tiempo en pantalla y la obesidad.*
+
+*Este modelo es más completo porque no ajusta por Actividad Física (que es un mediador) ni por autoestima (que es un collider) mientras que bloquea el backdoor generado a partir del nivel socioecónomico la educación y el tiempo en pantalla. Al controlar por educación, podemos ver con mayor claridad el efecto real del tiempo frente a pantallas, sin que esté confundido por otras variables. Además, cuenta con un mejor AIC que el modelo 1.*
+
+*-------------------------------------------------------------------------------------------------------*

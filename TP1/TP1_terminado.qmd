@@ -1,0 +1,309 @@
+---
+title: "tutorial_1"
+format: html
+editor: visual
+---
+
+# Tutoría 1. Práctica de R y tidyverse
+
+El desafio es sencillo, en esta notebook hay una serie de ejercicios para reproducir, no hay una sola respuesta (y no es la que da chatGPT), son todas tareas sencillas pero se pueden resolver de miles de formas distintas, traten de hacerlo de la forma mas original tratando de usar el minimo numero de lineas (que sea mas eficiente). Apoyense en google, stack overflow y busquedas sencillas de internet. Está lleno de problemas a los que nos enfrentamos los humanos todos los dias y la internet esta llena de explicaciones y comentarios.
+
+## Trump vs Kamala
+
+Lo que tienen en la siguiente línea es una base de datos con el perfil sociodemográfico de 500 votantes de estados unidos.
+
+#### Parte 1. Data cleaning
+
+Vamos a limpiar y explorar los datos. Los nombre sos un desastre, quizas quieran trabajar mas comodos con datos mas limpios. Si es asi exploren el paquete **janitor** que puede darles una mano\
+
+```{r}
+
+
+install.packages("tidyverse")
+library(tidyverse)
+
+install.packages("readr")
+library(readr)
+
+library(rstudioapi)
+
+setwd(dirname(getActiveDocumentContext()$path))
+getwd()
+
+data <- read_csv("dataset_votantes_trump.csv")
+
+
+install.packages("janitor")
+library(janitor)
+library(dplyr)
+
+#sacar columna ID
+data <- data %>% 
+  clean_names()
+
+data %>% 
+  select(estado_de_residencia) %>%  # Selecciona solo esta columna
+  distinct() %>%                    # unique() en Python
+  pull()     
+
+data <- data %>% 
+  mutate(estado_de_residencia = recode(estado_de_residencia, 
+                                       "Texaas" = "Texas", 
+                                       "Flrorida" = "Florida",
+                                       "Illionis" = "Illinois",
+                                       "Califronia" = "California"
+                                       ))
+
+data <- data %>%
+  select(-id)
+
+#data <- data %>%
+#  drop_na(frecuencia_de_voto)
+
+```
+
+**Ejercicio 1.** Hagamos un pequeño analisis exploratorio sacando un resumen de la base. Pista, la funcion summary de R base es bastante buena para ello., prestemos atencion a los valores minimos y maximos
+
+```{r}
+summary(data)
+#edad min 5  // max 150
+# Edades raras  -> los de 5 van a la secundaria y universidad y uno tiene hijos ??!!! gente con 150 años --> La persona más longeva del mundo fue Jeanne Louise Calment, una francesa que vivió 122 años y 164 días. 
+
+# ingreso min -5000 // max 1000000 
+# ingresos negativos
+
+# número de hijos min -1 // max 10
+# número de hijos negativo
+
+#sapply(data, function(x) if (is.numeric(x)) c(Min = min(x, na.rm = TRUE), Max = max(x, na.rm = TRUE))) devuelve max y min de las variables numericas
+```
+
+**Ejercicio 2:** Hay valores negativos en numero de hijos e ingresos, suponiendo que hay un typo, vamos a convertir los valores negativos en valores positivos para "numero de hijos" y "Ingreso anual", asignenlo a columnas con el sufijo \_corregido. Pista: investiguen que hace la funcion *abs*.
+
+```{r}
+
+data$numero_de_hijos <- abs(data$numero_de_hijos)
+data$ingreso_anual<- abs(data$ingreso_anual)
+#se sacan los negativos considerando el valor absoluto asumiendo error de tipeo
+# para evaluar por edades vamos a tener cuidado con los datos raros
+# los consideraremos solo para generos o niveles educativos alcanzados
+```
+
+**Ejercicio 3:** Hay algunas variables que estan guardadas como "character", sin embargo algunas son factores, vamos a convertir estado de residencia en un factor. Pistas: prueben trabajar con *factor*, *as.factor* (en R base) o *mutate* (en tidyverse), asignenlo a una nueva variable que se llame "estado_corregido". Cuando terminen hagan un summary de esa variable. Cuantos niveles tiene, son correctos?
+
+```{r}
+
+data <- data %>% mutate(estado_corregido = as.factor(estado_de_residencia))
+
+summary(data$estado_de_residencia) #caracteres sueltos
+summary(data$estado_corregido) # categorias creadas: 6. Son correctas son los estados e igualan a la cantidad de datos que hay (500).
+```
+
+**Ejercicio 4:** corrijamos los typos en la variable original y despues volvamos a hacer el factor, hay muchas opciones para hacer esto, pueden explorar usar la funcion ifelse por ejemplo
+
+```{r}
+
+# Los factores encontrados fueron: 
+# California    Florida   Illinois Nueva York      Texas       NA's 
+# corregimos antes los datos no quedaron errores e typos como NY o diferentes mayúsculas o minúsculas.
+```
+
+**Ejercicio 5:** Vamos a hacer un dataset de "MAGA"s, vamos a seleccionar votantes de Trump. Seleccione gente que pueda votar (mayores de 18 años), que vayan a votar (que su intencion de voto sea distinta de "nunca") y que no tenga valores vacios en sexo, edad, ni nivel educativo. Cree una variable nueva que se llame "educacion_universitaria", con valores si o no si la educacion es universitaria o mayor (posgrado o doctorardo). Quizas quieran leer como se usa el case_when o if_else
+
+```{r}
+
+# DataSet
+
+maga_data <- data %>%
+  filter(preferencia_politica == "Trump", 
+         edad >= 18, 
+         frecuencia_de_voto != "Nunca",
+         !is.na(genero),
+         !is.na(edad),
+         !is.na(nivel_educativo))
+
+#if_else(condición, valor_si_verdadero, valor_si_falso)
+
+maga_data <- maga_data %>%
+  mutate(educacion_universitaria = if_else(nivel_educativo %in% c("Universitario", "Posgrado", "Doctorado"), "Sí", "No"))
+```
+
+#### Parte 2. Graficos
+
+**Ejercicio 1:** queremos conocer la distribucion de los ingresos entre hombres y mujeres. Hagamos con ggplot un grafico de densidad en donde se observen la distribucion de los ingresos en hombres y en mujeres. Sean creativos, se pueden hacer ambos en un mismo grafico (exploren que capa en *aes* hara que tengan distinto no se, color o relleno) o pueden animarse a usar *facet* y hacer dos graficos paralelos. O pueden mostrarlo de alguna otra forma, hay espacio para ser creativos. Nota, si las distribuciones van a estar superpuestas por ahi es una buena idea hacerlas un poco transparentes, investiguen como funciona el argumento *alpha*
+
+```{r}
+library(ggplot2)
+
+ggplot(data %>% filter(!is.na(ingreso_anual) & !is.na(genero)), aes(x = ingreso_anual, fill = genero)) +
+  geom_histogram(position = "identity", alpha = 0.5, bins = 30) +
+  labs(title = "Histograma de ingresos por género",
+       x = "Ingreso anual",
+       y = "Frecuencia") +
+  theme_minimal()
+
+# En los intervalos con sueldo mas altos hay más hombres que mujeres.
+```
+
+**Ejercicio 2:** Vamos a ver la relacion entre el ingreso de hombres y mujeres segun la edad, y segun si votarian a Trump o a Kamala. Hagamos un scatter plot en donde en el eje de las x este el ingreso, en las y la edad, en distintos colores los puntos si son hombres o mujeres, y que haya en realidad dos graficos, uno para los votantes de Trump y otro de Kamala. A su vez, cada uno debe tener una linea de ajuste lineal para sexo y preferencia de voto (investigen como funciona *geom_smooth*). Ojo que hay algunos sujetos que no dijeron a quien iban a votar, quizas convenga filtrar y obtener solo los que dijeron a quien van a votar antes de graficar
+
+```{r}
+
+data_ejercicio2 <- data %>%
+  filter(frecuencia_de_voto != "Nunca", # Los que dicen que no votan 
+         edad != 5,     # Excluir personas con edad = 5
+         edad != 150,   # Excluir personas con edad = 150
+        complete.cases(edad, ingreso_anual, genero, preferencia_politica))  #                                                         Excluir NA en género en todo  
+ggplot(data_ejercicio2, aes(x = ingreso_anual, y = edad, color = genero)) +
+  geom_point(alpha = 0.7) +  # Puntos de dispersión
+  facet_wrap(~ preferencia_politica) +  # Crear facetas para Trump y Kamala
+  labs(title = "Relación entre Ingreso, Edad y Preferencia de Voto",
+       x = "Ingreso Anual",
+       y = "Edad",
+       color = "Género") +
+  theme_minimal()
+
+
+ggplot(data_ejercicio2, aes(x = ingreso_anual, y = edad, color = genero)) +
+  geom_point(alpha = 0.7) +  # Puntos de dispersión
+  geom_smooth(method = "lm", se = FALSE) +  # Línea de ajuste lineal sin intervalo de confianza
+  facet_wrap(~ preferencia_politica) +  # Crear facetas para Trump y Kamala
+  labs(title = "Relación entre Ingreso, Edad y Preferencia de Voto",
+       x = "Ingreso Anual",
+       y = "Edad",
+       color = "Género") +
+  theme_minimal()
+```
+
+**Ejercicio 3:** ¿cual es la correlacion entre ingreso y edad por sexo? Se anima a calcularla? Estaria bueno mostrar esa correlacion creando un grafico de puntos con la linea de tendencia (una por sexo) y anotar en el mismo color de la linea el valor de la correlacion. Pista pueden usar *geom_anotate* para agregar valores
+
+```{r}
+
+cor_masc <- cor(data_ejercicio2$edad[data_ejercicio2$genero == "Masculino"], 
+               data_ejercicio2$ingreso_anual[data_ejercicio2$genero =="Masculino"])
+
+cor_fem <- cor(data_ejercicio2$edad[data_ejercicio2$genero == "Femenino"], 
+              data_ejercicio2$ingreso_anual[data_ejercicio2$genero == "Femenino"])
+
+cor_otro <- cor(data_ejercicio2$edad[data_ejercicio2$genero == "Otro"], 
+               data_ejercicio2$ingreso_anual[data_ejercicio2$genero == "Otro"])
+
+
+colores_genero <- c("Femenino" = "#FFC0CB", 
+                    "Masculino" = "#77DD77", 
+                    "Otro" = "#ADD8E6") 
+
+ggplot(data_ejercicio2, aes(x = ingreso_anual, y = edad, color = genero)) +
+  geom_point(alpha = 0.6) +
+  geom_smooth(method = "lm", se = FALSE) +
+  
+  annotate("text", x = max(data_ejercicio2$ingreso_anual, na.rm = TRUE) * 0.9, 
+           y = max(data_ejercicio2$edad, na.rm = TRUE) * 0.95, 
+           label = paste("Corr. Femenino:", round(cor_fem, 2)), color = colores_genero["Femenino"]) +
+  
+  annotate("text", x = max(data_ejercicio2$ingreso_anual, na.rm = TRUE) * 0.9, 
+           y = max(data_ejercicio2$edad, na.rm = TRUE) * 0.90, 
+           label = paste("Corr. Masculino:", round(cor_masc, 2)), color = colores_genero["Masculino"]) +
+  
+  annotate("text", x = max(data_ejercicio2$ingreso_anual, na.rm = TRUE) * 0.9, 
+           y = max(data_ejercicio2$edad, na.rm = TRUE) * 0.85, 
+           label = paste("Corr. Otro:", round(cor_otro, 2)), color = colores_genero["Otro"]) +
+  
+  scale_color_manual(values = colores_genero) +
+  
+  labs(title = "Relación entre Ingreso Anual y Edad por Género",
+       x = "Ingreso Anual",
+       y = "Edad") +
+  
+  theme_minimal()
+```
+
+#### Parte 2. Regresion para entender a los MAGAs
+
+Vamos a usar los sujetos de nuestra nueva base. Queremos predecir el ingreso anual que reportan en funcion de su genero, su edad, si fueron a la universidad o no y el numero de hijos.
+
+**Ejercicio 1.** Corramos una regresion lineal para responder esta pregunta
+
+```{r}
+maga_data$genero <- as.factor(maga_data$genero)
+maga_data$educacion_universitaria <- as.factor(maga_data$educacion_universitaria)
+
+# Correr la regresión lineal
+modelo_regresion <- lm(ingreso_anual ~ genero + edad + educacion_universitaria + numero_de_hijos, data = maga_data)
+
+# Ver el resumen del modelo
+summary(modelo_regresion)
+
+
+# Ejercicio 3:
+plot(modelo_regresion)
+#Q-Q Residuals: sigue distribucion normal --> cumple supuesto de normalidad de errores(sacando outliers). Los puntos siguen aproximadamente la línea diagonal
+# Residuals vs Fitted: cumple supuesto de linealidad. No hay patrones sistematicos (ejemplo: U)
+# Scale-Location: homocedasticidad (nube de puntos), distribuidos más o menos de manera uniforme (aunque hay una tendencia a bajar cuando los valores de x aumentan)  
+
+library(performance)
+
+# Comprobar los supuestos del modelo con check_model
+check_model(modelo_regresion) #cumple los supuestos
+
+
+```
+
+**Ejercicio 2.** Como interpretaria el modelo? escriba un breve parrafo interpretando los coeficientes:
+
+*Respuesta:* *Del modelo podemos obtener, en primer lugar, que los datos no se ajustan bien al modelo ya que el R\^2 es menor a 0.1, es decir que este no sirve para predecir el ingreso anual. Además, el p-value asociado al estadístico de Fisher es mayor a 0.05, por lo tanto a nivel global no podemos encontrar significancia. La única variable regresora que pareciera ser significativa es el número de hijos, que está relacionada inversamente con el ingreso anual. Por cada hijo adicional el ingreso se vería disminuido en \$13.400,18, en otras palabras, mientras menos hijos tiene una familia, reciben más ingreso. Por otro lado, el intercept (ingreso anual si el resto de las variables son 0) indica un gran nivel de significancia. Esto en un contexto real puede no tener sentido, sobre todo teniendo en cuenta que una de las variables X utilizadas es la edad.*
+
+**Ejercicio 3**. Esta regresion cumple con los supuestos que debería. Chequee la distribucion normal de los residuos y haga un qqplot de los mismos. Puede chequear otros supuestos. Pruebe la funcion check_model del paquete performance
+
+*Respuesta: Cumple con los supuestos.*
+
+#### Parte 3. Regresion logistica, prediciendo al votante de Trump
+
+Vamos a volver a nuestra base completa. Vamos a construir una regresion logistica para predecir un outcome binario (voto a trump o no). En funcion de la edad, el sexo, el ingreso anual y si es universitario o no. Recuerde excluir a los sujetos que tienen frecuencia de voto "nunca". Corramos esta linea para obtener la base limpia, solo tienen que correr el modelo
+
+```{r}
+datos_rlogistica <- data %>%
+  filter(frecuencia_de_voto != "Nunca", # Los que dicen que no votan 
+         edad != 5,     # Excluir personas con edad = 5
+         edad != 150,   # Excluir personas con edad = 150
+        complete.cases(edad, ingreso_anual, genero, preferencia_politica, nivel_educativo))  #Excluir NA en género en todo  
+
+
+datos_rlogistica[, c("genero", "nivel_educativo","preferencia_politica")] <- lapply(datos_rlogistica[, c("genero", "nivel_educativo","preferencia_politica")], as.factor)
+```
+
+```{r}
+
+datos_rlogistica <- datos_rlogistica %>%
+  mutate(preferencia_binaria = ifelse(preferencia_politica == "Trump", 1, 0))
+
+# Ajuste del modelo de regresión logística
+modelo_logistico <- glm(preferencia_binaria ~ edad + genero + nivel_educativo + ingreso_anual,
+                        data = datos_rlogistica, 
+                        family = binomial)
+
+summary(modelo_logistico)
+#test deviance
+D = modelo_logistico$null.deviance - modelo_logistico$deviance 
+p_valor = 1-pchisq(D, 1)
+p_valor
+```
+
+**Ejercicio 1:** Interprete el modelo. Que significan los coeficientes obtenidos?
+
+*Respuesta: a partir del los resultados de summary, se puede inferir que el modelo no tiene significancia estadística. Esto es, que las variables regresoras tenidas en cuenta no sirven para predecir si una persona votará a MAGA o no, dado que los p-values son altos. Sin embargo, en el test deviance que nos indica la significancia a nivel global, se obtuvo un p-value\<0.05, lo que indicaría que el modelo puede ser explicado por las variables predictoras.*
+
+*Esto tiene dos explicaciones posibles: una de ellas es que la educación si tiene un peso en la predicción (se podría decir que quienes alcanzaron solo educación primaria/secundaria están más predispuestos a votar a Trump), ya que a nivel individual fue la única variable predictora significativa. La otra explicación es que hay cierta multicolinealidad entre variables (por ejemplo edad e ingreso o educación universitaria e ingreso), por lo tanto el modelo tiene dificultades para distinguir los efectos individuales de cada una de ellas.*
+
+**Ejercicio 2:** convierta los coeficientes en OR, como los interpreta?
+
+```{r}
+odds_ratios <- exp(coef(modelo_logistico))
+
+# Mostrar Odds Ratios
+print(odds_ratios)
+```
+
+*Respuesta: Debido a que la información que brindan los OR está asociada a la variación de probabilidades de un evento en relación con la VI, se puede mencionar que las variables tienen un efecto diminuto sobre la posibilidad de votar a Trump las próximas elecciones.*
+
+*Según los datos, las personas con educación primaria tienen 2.72 veces más probabilidades de votar por Trump en comparación con la categoría de referencia (Doctorado). Las variables que disminuirían la probabilidad de ocurrencia del evento (votar a Trump) son, sobre todo, que el género sea femenino u otro y que las personas tengan formación universitaria (ya que para ambos casos OR\<1).*
