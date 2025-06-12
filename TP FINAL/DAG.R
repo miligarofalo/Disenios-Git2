@@ -164,40 +164,8 @@ cat("\nVariables no de interés:\n")
 print(variables_no_interes)
 
 
-
-# VARIABLES FINALES
-# q1 --> EDAD
-# q2 --> SEXO
-# q22 --> se sintio solo
-# q26 --> intento suicidarse
-# q49 --> actividad física
-
-# q66 q67 q68 (ciberbullying) --> bullying AGREGAR TABLA TEORICA
-# q55 q56 q57 q58  --> contención familiar
-# q39/q33     --> consumo familiar
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+# ---------------------------------------------------------------------
+# ---------------------------------------------------------------------
 
 
 
