@@ -144,11 +144,10 @@ data <- data[, columnas_filtradas]
 
 # Variables de interés (similar a lo que tenías en el código Python)
 variables_interes <- c(
-  'q1', 'q2', 'q4', 'q5', 'q6', 'q10', 'q15', 'q16', 'q22', 
-  'q26', 'q27', 'q28', 'q29', 'q30', 'q31', 'q34', 'q35', 'q36',
-  'q38', 'q40', 'q41', 'q42', 'q43', 'q49', 'q55', 'q56', 'q57', 
-  'q58', 'q61', 'q62', 'q66', 'q67', 'q68'
-)
+  'q1', 'q2',  'q22', 
+  'q26', 'q49', 
+   'q55', 'q56', 'q57', 'q58','q39', 'q66', 'q67' 
+    )
 
 # Eliminar columnas que no están en las variables de interés
 data_interes <- data[, variables_interes]
@@ -166,7 +165,7 @@ print(variables_no_interes)
 data_clean <- data %>% 
   mutate(across(everything(), as.numeric)) %>%
   drop_na()
-
+# SACAMOS NAN!!!!
 
 
 # COMBIANCION DE LAS VARIABLES -----------------------------
@@ -244,38 +243,29 @@ vif(modelo_logit)
 
 
 # ---------------------------------------------------- MATCHING ---------------------------------------------------------------
+library(MatchIt)
 
-matching <- matchit(Suicidio ~ Sexo + Edad + Actividad_Fisica, 
-                    data = df, 
-                    method = "nearest", 
-                    distance = "mahalanobis", 
-                    discard = "none")  # Usamos la distancia Mahalanobis
+data_clean <- data_clean %>%
+  mutate(soledad = if_else(q22 >= 4, 1, 0))  # 1 = se siente solo, 0 = no se siente solo
+table(data_clean$q22, useNA = "always")
 
-# Resumen de los resultados del matching
-summary(matching)
+# Usamos soledad como una variable ordinal (no binaria)
+match <- matchit(soledad ~ q1 + Sexo + bullying_score + consumo_familiar + 
+                   contencion_familiar + q49,
+                 data = data_clean,
+                 method = "nearest", distance = "Mahalanobis")
 
-# Obtener el conjunto emparejado
-matched_data <- match.data(matching)
+# Diagnóstico
+summary(match)
+plot(match)
 
-# Ver los resultados del matching
-head(matched_data)
-
-# Verificar el balance de covariables después del matching
-plot(matching)
+modelo_matched <- glm(Suicidio ~ soledad, data = match.data(match), family = binomial)
+summary(modelo_matched)
 
 
-# Ajustar el modelo logit en el conjunto emparejado
-modelo_final <- glm(Suicidio ~ Soledad + Sexo + Edad + Actividad_Fisica, 
-                    family = binomial(link = "logit"), data = matched_data)
-
-# Resumen del modelo final
-summary(modelo_final)
 
 
 
 
 # Guardar el gráfico del DAG (Si lo necesitas)
 ggsave("dag_paths_soledad_to_suicidio.pdf", plot = last_plot(), width = 20, height = 16)
-
-# Guardar el conjunto de datos emparejado
-write.csv(matched_data, "matched_data.csv")
