@@ -1,6 +1,5 @@
-#install.packages("showtext")
-# install.packages("sysfonts")
-#showtext_auto()
+install.packages("showtext")
+install.packages("sysfonts")
 
 library(dagitty)
 library(ggdag)
@@ -9,18 +8,18 @@ library(dplyr)
 library(showtext)
 library(sysfonts)
 library(tidyverse)
+library(readr)
 
 
 # Creamos el DAG
 causal <- dagitty("dag {
   bb=\"0,0,1,1\"
-  \"Actividad Física\" [pos=\"0.581,0.104\"]
-  \"Alimentación\" [pos=\"0.416,0.576\"]
-  \"Consumo Familiar\" [pos=\"0.680,0.772\"]
-  \"Contención familiar\" [pos=\"0.142,0.073\"]
+  \"Actividad Fisica\" [pos=\"0.581,0.104\"]
+  \"Alimentacion\" [pos=\"0.416,0.576\"]
+  \"Contencion familiar\" [pos=\"0.142,0.073\"]
   \"Intento de suicidio\" [outcome,pos=\"0.791,0.302\"]
   \"Pobreza extrema\" [pos=\"0.489,0.858\"]
-  \"Violencia Física\" [pos=\"0.587,0.427\"]
+  \"Violencia Fisica\" [pos=\"0.587,0.427\"]
   Bullying [pos=\"0.329,0.800\"]
   Consumo [pos=\"0.773,0.619\"]
   Edad [pos=\"0.282,0.443\"]
@@ -28,24 +27,20 @@ causal <- dagitty("dag {
   Sexo [pos=\"0.162,0.576\"]
   Soledad [exposure,pos=\"0.146,0.262\"]
   
-  \"Actividad Física\" -> \"Intento de suicidio\"
-  \"Actividad Física\" -> IMC
-  \"Alimentación\" -> IMC
-  \"Consumo Familiar\" -> \"Contención familiar\"
-  \"Consumo Familiar\" -> \"Violencia Física\"
-  \"Consumo Familiar\" -> Consumo
-  \"Contención familiar\" -> \"Intento de suicidio\"
-  \"Contención familiar\" -> Soledad
-  \"Pobreza extrema\" -> \"Alimentación\"
-  \"Pobreza extrema\" -> \"Consumo Familiar\"
+  \"Actividad Fisica\" -> \"Intento de suicidio\"
+  \"Actividad Fisica\" -> IMC
+  \"Alimentacion\" -> IMC
+  \"Contencion familiar\" -> \"Intento de suicidio\"
+  \"Contencion familiar\" -> Soledad
+  \"Pobreza extrema\" -> \"Alimentacion\"
   \"Pobreza extrema\" -> \"Intento de suicidio\"
   \"Pobreza extrema\" -> Consumo
-  \"Violencia Física\" -> \"Intento de suicidio\"
+  \"Violencia Fisica\" -> \"Intento de suicidio\"
   Bullying -> \"Intento de suicidio\"
-  Bullying -> \"Violencia Física\"
+  Bullying -> \"Violencia Fisica\"
   Bullying -> Soledad
   Consumo -> \"Intento de suicidio\"
-  Consumo -> \"Violencia Física\"
+  Consumo -> \"Violencia Fisica\"
   Edad -> \"Intento de suicidio\"
   Edad -> Soledad
   IMC -> Bullying
@@ -55,8 +50,9 @@ causal <- dagitty("dag {
   Soledad -> Consumo
 }")
 
-
-
+#Letra
+font_add_google("Quicksand", "quicksand")
+showtext_auto()
 
 # Colores pastel cute
 cute_colors <- c("#FFB3BA", "#FFDFBA", "#FFFFBA", "#BAFFC9", "#BAE1FF", 
@@ -64,7 +60,7 @@ cute_colors <- c("#FFB3BA", "#FFDFBA", "#FFFFBA", "#BAFFC9", "#BAE1FF",
                  "#E0CCFF", "#D9F9D9", "#FFD6A5", "#CBAACB")
 
 
-# Visualización linda y sin etiquetas duplicadas
+# Visualización 
 ggdag(causal, text = FALSE) +  
   geom_dag_node(aes(fill = factor(name)), shape = 21, size = 30, color = "white", alpha = 0.9) +  # ⬅️ nodos más grandes
   geom_dag_edges(edge_color = "#F9AFAE", edge_alpha = 0.8, edge_width = 1.3) +
@@ -208,6 +204,7 @@ data_clean <- data_clean %>%
     Sexo = if_else(q2 == 2, 1, 0),      
     Suicidio = if_else(q26 > 1, 1, 0)   # 1 = al menos un intento
   )
+head(data_clean)
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
@@ -221,11 +218,12 @@ data_clean <- data_clean %>%
 
 
 # 2. Ajustar modelo logístico
-modelo_logit <- glm(Suicidio ~ bullying_score_z + contencion_familiar_z + consumo_familiar +
-                      q1 + q2 + q22 + q49,
+modelo_logit <- glm(Suicidio ~ bullying_score_z + contencion_familiar_z +
+                      q1 + Sexo + q22 + q49,
                     data = data_clean,
                     family = binomial)
 
+modelplot(modelo_logit, coef_omit = 'Interc')
 # 3. Ver resultados
 summary(modelo_logit)
 
