@@ -79,6 +79,9 @@ causal %>% ggdag_paths_fan (shadow = TRUE, node_size = 18, text_size = 4, spread
 # Obtener todos los caminos entre "Soledad" e "Intento de suicidio"
 all_paths <- dag_paths(causal, from = "Soledad", to = "Intento de suicidio", paths_only = FALSE)
 
+
+
+
 # Crear el gráfico del DAG completo
 dag_plot <- ggdag(causal, text = FALSE) +  
   geom_dag_node(aes(fill = factor(name)), shape = 21, size = 30, color = "white", alpha = 0.9) +  # Nodos más grandes
@@ -121,6 +124,7 @@ library(MatchIt)
 
 library(rstudioapi)
 library(readr)
+
 setwd(dirname(getActiveDocumentContext()$path))
 getwd()
 data <- read_csv("National.csv")
@@ -204,7 +208,7 @@ data_clean <- data_clean %>%
     Sexo = if_else(q2 == 2, 1, 0),      
     Suicidio = if_else(q26 > 1, 1, 0)   # 1 = al menos un intento
   )
-head(data_clean)
+
 # ---------------------------------------------------------------------
 # ---------------------------------------------------------------------
 
@@ -223,10 +227,13 @@ modelo_logit <- glm(Suicidio ~ bullying_score_z + contencion_familiar_z +
                     data = data_clean,
                     family = binomial)
 
+install.packages("modelr")
+library(modelr)
 modelplot(modelo_logit, coef_omit = 'Interc')
+
 # 3. Ver resultados
 summary(modelo_logit)
-
+exp(0.597272)
 
 
 #  Verificación de multicolinealidad --> debajo de 2
@@ -248,7 +255,7 @@ data_clean <- data_clean %>%
 table(data_clean$q22, useNA = "always")
 
 # Usamos soledad como una variable ordinal (no binaria)
-match <- matchit(soledad ~ q1 + Sexo + bullying_score + consumo_familiar + 
+match <- matchit(soledad ~ q1 + Sexo + bullying_score_z + contencion_familiar_z + # se usan las normalizadas
                    contencion_familiar + q49,
                  data = data_clean,
                  method = "nearest", distance = "Mahalanobis")
@@ -259,7 +266,7 @@ plot(match)
 
 modelo_matched <- glm(Suicidio ~ soledad, data = match.data(match), family = binomial)
 summary(modelo_matched)
-
+exp(1.26307)
 
 
 
