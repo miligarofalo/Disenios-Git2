@@ -145,7 +145,7 @@ data <- data[, columnas_filtradas]
 # Variables de interés (similar a lo que tenías en el código Python)
 variables_interes <- c(
   'q1', 'q2',  'q22', 
-  'q26', 'q49', 
+  'q26', 
    'q55', 'q56', 'q57', 'q58','q39', 'q66', 'q67' 
     )
 
@@ -202,6 +202,11 @@ data_clean <- data_clean %>%
 
 
 
+modelo_lineal <- glm(Suicidio ~ bullying_score_z, data = data_clean, family = "binomial")
+summary(modelo_lineal)
+plot(modelo_lineal)
+
+
 # recodificamos las variables que quedan 
 data_clean <- data_clean %>%
   mutate(
@@ -213,8 +218,6 @@ data_clean <- data_clean %>%
 # ---------------------------------------------------------------------
 
 
-
-
 # 'Suicidio' es la variable binaria
 # Ajustar el modelo logit
 #modelo_logit <- glm(Suicidio ~ Soledad + Edad + Sexo + Bullying + Consumo_Familiar + Contencion_Familiar, 
@@ -223,7 +226,7 @@ data_clean <- data_clean %>%
 
 # 2. Ajustar modelo logístico
 modelo_logit <- glm(Suicidio ~ bullying_score_z + contencion_familiar_z +
-                      q1 + Sexo + q22 + q49,
+                      q1 + Sexo + q22,
                     data = data_clean,
                     family = binomial)
 
@@ -234,6 +237,7 @@ modelplot(modelo_logit, coef_omit = 'Interc')
 # 3. Ver resultados
 summary(modelo_logit)
 exp(0.597272)
+
 
 
 #  Verificación de multicolinealidad --> debajo de 2
@@ -254,11 +258,23 @@ data_clean <- data_clean %>%
   mutate(soledad = if_else(q22 >= 4, 1, 0))  # 1 = se siente solo, 0 = no se siente solo
 table(data_clean$q22, useNA = "always")
 
+# Crear versión binaria de contención familiar (ejemplo: arriba y abajo mediana)
+data_clean <- data_clean %>%
+  mutate(
+    contencion_bin = if_else(contencion_familiar > median(contencion_familiar, na.rm = TRUE), 1, 0)
+  )
+
 # Usamos soledad como una variable ordinal (no binaria)
-match <- matchit(soledad ~ q1 + Sexo + bullying_score_z + contencion_familiar_z + # se usan las normalizadas
-                   contencion_familiar + q49,
+match <- matchit(soledad ~ q1 + Sexo + bullying_bin + contencion_bin,  # se usan las normalizadas
                  data = data_clean,
                  method = "nearest", distance = "Mahalanobis")
+
+
+# Usamos soledad como una variable ordinal (no binaria)
+match <- matchit(soledad ~ q1 + Sexo + bullying_score_z + contencion_familiar_z,  # se usan las normalizadas
+                 data = data_clean,
+                 method = "nearest", distance = "Mahalanobis")
+
 
 # Diagnóstico
 summary(match)
@@ -266,7 +282,7 @@ plot(match)
 
 modelo_matched <- glm(Suicidio ~ soledad, data = match.data(match), family = binomial)
 summary(modelo_matched)
-exp(1.26307)
+exp(1.30454)
 
 
 
